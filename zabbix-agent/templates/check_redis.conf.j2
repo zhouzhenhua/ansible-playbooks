@@ -1,0 +1,6 @@
+# 注意 请安装zabbix_sender
+# 在zabbix_agentd.conf文件末尾加入配置 脚本实际路径为准
+UserParameter=redis_status,/etc/zabbix/script/redis_stat.sh
+UserParameter=redis.discovery_db,/etc/zabbix/script/redis_stat.sh db
+UserParameter=redis.discovery_cmd,/etc/zabbix/script/redis_stat.sh cmd
+UserParameter=redis_sentinels_status,/usr/local/bin/redis-cli -p 26379 "INFO"|grep master0|awk -F',' '{print $3}'|awk -F'=' '{print $2}'

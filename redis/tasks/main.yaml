@@ -1,0 +1,86 @@
+---
+- name: Manage sysctl
+  sysctl: name="{{ item.key }}" value="{{ item.val }}" state=present
+  with_items:
+  - { key: "vm.overcommit_memory", val: "1" }
+
+- name: disable-transparent-hugepages
+  shell: echo "never" > /sys/kernel/mm/transparent_hugepage/enabled && /sbin/sysctl -p
+
+- name: write transparent_hugepage rc.local
+  lineinfile:
+    path: /etc/rc.local
+    regexp: '^echo "never"'
+    line: 'echo "never" > /sys/kernel/mm/transparent_hugepage/enabled'
+    create: yes
+- name: write init rds rc.local
+  lineinfile:
+    path: /etc/rc.local
+    regexp: '/etc/redis/redis_{{ redis_port }}.conf'
+    line: 'su - {{ run_user }} -c "/usr/local/bin/redis-server /etc/redis/redis_{{ redis_port }}.conf"'
+    create: yes
+  tags: initrds
+
+- name: write init rds2 rc.local
+  lineinfile:
+    path: /etc/rc.local
+    regexp: '/etc/redis/redis_{{ redis_port2 }}.conf'
+    line: 'su - {{ run_user }} -c "/usr/local/bin/redis-server /etc/redis/redis_{{ redis_port2 }}.conf"'
+    create: yes
+  tags: initrds
+  when: "redis_port2 is defined"
+
+- name: Extract redisl file
+  unarchive:
+    src: http://download.redis.io/releases/redis-{{ redis_version }}.tar.gz 
+    dest: "{{ pack_dir }}"
+    remote_src: yes
+    mode: 0755
+
+- name: Install a list of packages
+  yum: 
+    name: 
+      - tcl
+      - gcc
+      - gcc-c++  
+- name: install redis
+  shell: make MALLOC=libc && make test && make install chdir={{ pack_dir }}/redis-{{ redis_version }}
+  tags: makerds
+
+- name: First rds instance
+  block:    
+    - name: mdkir redis dir
+      file: path={{ item }} state=directory mode=0755 owner={{ run_user }} group={{ run_user }} force=yes
+      with_items:
+        - '{{ redis_confdir }}'
+        - '{{ redis_logdir }}'
+        - '{{ redis_datadir }}_{{ redis_port }}'
+      tags: mkdirs
+    - name: sync redis config file
+      template:
+        src: redis.conf.j2
+        dest: "{{ redis_confdir }}/redis_{{ redis_port }}.conf"
+      tags: rdscfg
+    
+    - name: run redis
+      shell: 'su - {{ run_user }} -c "/usr/local/bin/redis-server /etc/redis/redis_{{ redis_port }}.conf"'
+      tags: rdsrun
+  when: "redis_port is defined"
+
+- name: Second instance
+  block:    
+    - name: mdkir redis dir
+      file: path={{ item }} state=directory mode=0755 owner={{ run_user }} group={{ run_user }} force=yes
+      with_items:
+        - '{{ redis_datadir }}_{{ redis_port2 }}'
+      tags: mkdirs
+    - name: sync redis config file
+      template:
+        src: redis_second.conf.j2
+        dest: "{{ redis_confdir }}/redis_{{ redis_port2 }}.conf"
+      tags: rdscfg
+    
+    - name: run redis
+      shell: 'su - {{ run_user }} -c "/usr/local/bin/redis-server /etc/redis/redis_{{ redis_port2 }}.conf"'
+      tags: rdsrun
+  when: "redis_port2 is defined"

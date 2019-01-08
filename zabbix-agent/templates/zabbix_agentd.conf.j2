@@ -1,0 +1,19 @@
+PidFile=/var/run/zabbix/zabbix_agentd.pid
+LogFile=/var/log/zabbix/zabbix_agentd.log
+LogFileSize=0
+{% if env == "az" %}
+Server=192.168.102.72
+ServerActive=192.168.102.72:{{ zbx_ser_port }}
+{% endif %}
+{% if env == "idc" %}
+Server=172.16.100.101
+ServerActive=172.16.100.101:{{ zbx_ser_port }}
+{% endif %}
+{% if env == "aly" %}
+Server=172.16.200.115
+ServerActive=172.16.200.115:{{ zbx_ser_port }}
+{% endif %}
+Hostname={{ ansible_fqdn }}-{{ remote_ip }}
+HostMetadataItem=system.uname
+Include=/etc/zabbix/zabbix_agentd.d/*.conf
+UnsafeUserParameters=1

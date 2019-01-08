@@ -1,0 +1,35 @@
+---
+- name: check zabbix scripts dir exist
+  command: ls /etc/zabbix/script
+  register: result
+  ignore_errors: True
+
+- name: mk zabbix scripts dir
+  file:
+    state: directory
+    path: /etc/zabbix/script
+    owner: zabbix
+    group: zabbix
+    recurse: yes
+  when: result|failed
+
+- name: copy_check_redis_conf
+  template: src=check_redis.conf.j2 dest=/etc/zabbix/zabbix_agentd.d/check_redis.conf backup=true    
+    
+- name: copy_redis_stat.sh
+  copy: 
+    src: redis_stat.sh
+    dest: /etc/zabbix/script 
+    owner: zabbix 
+    group: zabbix 
+    mode: 0775 
+    backup: true 
+  notify:
+   - restart_zabbix_agent
+
+- name: chown var_log_zabbix
+  file:
+    path: /var/log/zabbix/
+    owner: zabbix
+    group: zabbix
+    recurse: yes  

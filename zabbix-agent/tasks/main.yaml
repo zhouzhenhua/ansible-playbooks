@@ -1,0 +1,71 @@
+---
+#- name: Set vm hostname
+#  hostname:
+#    name: '{{ remote_hostname }}'
+
+- name: Install Centos Zabbix-agent
+  block:
+    - name: Add repository
+      yum_repository:
+        name: zabbix-agent
+        description: Zabbix agent YUM repo
+        baseurl: http://repo.zabbix.com/zabbix/3.4/rhel/{{ ansible_distribution_major_version }}/$basearch/
+        gpgcheck: no
+    
+    - name: install_zabbix_rpm
+      yum: name={{ item }} state=present
+      with_items:
+        - zabbix-agent
+        - zabbix-sender
+  when: 
+    - ansible_distribution == "CentOS"
+
+- name: Install Ubuntu16.04 Zabbix-agent
+  block:
+   # - name: Download package
+   #   get_url:
+   #     url: https://repo.zabbix.com/zabbix/3.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_3.4-1+xenial_all.deb
+   #     dest: /tmp/zabbix-release_3.4-1+bionic_all.deb
+   #     force: yes
+   # - name: install zabbix-release deb
+   #   shell: dpkg -i /tmp/zabbix-release_3.4-1+xenial_all.deb 
+   
+    - name: install zabbix-release deb
+      apt:
+        deb: https://repo.zabbix.com/zabbix/3.4/ubuntu/pool/main/z/zabbix-release/zabbix-release_3.4-1+xenial_all.deb
+    
+    - name: Update repositories cache and install "zabbix-agent" package
+      apt:
+        name: zabbix-agent
+        update_cache: yes
+        state: present
+      
+  when:
+    - ansible_distribution == "Ubuntu"  
+    - ansible_distribution_version == "16.04"
+
+- name: copy_check_netstat_conf
+  template: src=check_netstat.conf.j2 dest=/etc/zabbix/zabbix_agentd.d/check_netstat.conf backup=true    
+    
+- name: copy_conf
+  template: src=zabbix_agentd.conf.j2 dest=/etc/zabbix/zabbix_agentd.conf backup=true
+  notify:
+   - restart_zabbix_agent
+
+- name: start_servcie zabbix_agent
+  service: name=zabbix-agent state=started enabled=yes
+  when: ansible_distribution_major_version == "6"
+
+- name: start_systemd zabbix_agent
+  systemd: name=zabbix-agent state=started enabled=yes
+  when: ansible_distribution_version == "16.04" or ansible_distribution_major_version == "7" 
+
+
+#- name: Include task list in redis
+- include: zbx_rds.yaml
+  when: "zbx_rds is defined and zbx_rds == 'yes'"
+  tags: monitor_rds
+ 
+- include: zbx_rmq.yaml
+  when: "zbx_rmq is defined and zbx_rmq == 'yes'"
+  tags: monitor_rmq

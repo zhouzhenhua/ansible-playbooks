@@ -1,0 +1,7 @@
+rmq_basedir: /data/rabbitmq
+rmq_confdir: /etc/rabbitmq
+rmq_ssl_basedir: /data/rabbitmq/ssl
+rmq_data_basedir: /data/rabbitmq/data
+pack_dir: /tmp
+rmq_user: JDRabbitMQ
+rmq_pass: Ud5uXy]FF1i9AmDgxg7Z

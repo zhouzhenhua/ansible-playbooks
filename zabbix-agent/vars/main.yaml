@@ -1,0 +1,2 @@
+env: az    # az|idc|aly
+zbx_ser_port: 10051

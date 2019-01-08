@@ -1,0 +1,41 @@
+---
+- name: check zabbix scripts dir exist
+  command: ls /etc/zabbix/script
+  register: result
+  ignore_errors: True
+
+- name: mk zabbix scripts dir
+  file: 
+    state: directory 
+    path: /etc/zabbix/script
+    owner: zabbix
+    group: zabbix
+    recurse: yes
+  when: result|failed
+
+- name: unzip rabbitmq scripts 
+  unarchive:
+    src: rabbitmq.tar.gz
+    dest: /etc/zabbix/script
+    owner: zabbix
+    group: zabbix
+    mode: 0775
+
+- name: copy zabbix_check_rabbitmq conf
+  template: src=check_rabbitmq.conf.j2 dest=/etc/zabbix/zabbix_agentd.d/check_rabbitmq.conf
+
+- name: copy zabbix_auth_conf
+  template: src=rab.auth.j2 dest=/etc/zabbix/script/rabbitmq/.rab.auth backup=yes
+  notify:
+    - restart_zabbix_agent
+    
+#- name: chown var_log_zabbix
+#  file:
+#    path: /var/log/zabbix/
+#    owner: zabbix
+#    group: zabbix
+#    recurse: yes
+
+#- name: Include task list in redis
+#  include_tasks: "zbx_redis.yaml"
+#  when: "zbx_redis is defined and zbx_redis == 'yes'"  

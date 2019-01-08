@@ -1,0 +1,13 @@
+redis_version: 4.0.11
+pack_dir: /tmp
+ansible_python_interpreter: /usr/bin/python2.6
+
+####
+redis_port: 6379
+redis_datadir: /data/redis/data
+redis_logdir: /data/redis/logs
+redis_confdir: /etc/redis
+mem_size: 2gb 
+#redis_pass: MsP/LV$jIm
+redis_pass: h2wLS6EMuIdKMBIiQiVb
+run_user: jdadmin
