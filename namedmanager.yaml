@@ -1,0 +1,4 @@
+---
+- hosts: '{{ remote_server }}'
+  roles:
+    - role: namedmanager

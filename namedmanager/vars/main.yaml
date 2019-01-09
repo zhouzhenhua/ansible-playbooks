@@ -1,0 +1,12 @@
+# namedmanager-www
+db_name_namedmanager: namedmanager
+db_user_namedmanager: namedmanager
+db_pass_namedmanager: i6I4YIfJNG
+# namedmanager-bind
+api_url: http://dns1.devops.local/namedmanager
+api_server_name: dns1.devops.local
+api_auth_key: T=fFR/o6LYkyFkyc|3a+
+# namedmanager-conf-dir
+namedmanager_conf_dir: /etc/namedmanager
+# mysql-root-pass
+mysql_root_pass: uuKjTeNDrU

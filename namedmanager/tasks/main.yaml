@@ -1,0 +1,98 @@
+---
+- name: install_mysql
+  yum: name={{ item }} state=present
+  with_items:
+    - mysql-server
+    - MySQL-python
+  when:
+    - ansible_distribution == "CentOS"
+    - ansible_distribution_major_version == "6"
+
+- name: start_mysql
+  service: name=mysqld state=started enabled=yes
+
+- name: set_mysql_root_pw
+  shell: mysqladmin -uroot password '{{ mysql_root_pass }}'
+  
+- name: create_db_name
+  mysql_db:
+    login_host: "127.0.0.1"
+    login_user: "root"
+    login_password: "{{ mysql_root_pass }}"
+    login_port: "3306"
+    name: "{{ db_name_namedmanager }}"
+    encoding: "utf8"
+    state: "present"
+
+- name: create_db_user
+  mysql_user:
+    login_host: "127.0.0.1"
+    login_user: "root"
+    login_password: "{{ mysql_root_pass }}"
+    login_port: "3306"
+    name: "{{ db_name_namedmanager }}"
+    password: "{{ db_pass_namedmanager }}"
+    host: "localhost"
+    priv: "*.*:all"
+    state: "present"
+
+- name: copy_namedmanager_sql
+  copy:
+    src: namedmanager.20180421.sql.gz
+    dest: /tmp/namedmanager.sql.gz
+    
+- name: import_dbsql
+  mysql_db:
+    login_host: "127.0.0.1"
+    login_user: "root"
+    login_password: "{{ mysql_root_pass }}"
+    login_port: "3306"
+    name: "{{ db_name_namedmanager }}"
+    target: "/tmp/namedmanager.sql.gz"
+    state: "import"
+
+- name: copy_namedmanager-www
+  copy:
+    src: namedmanager-www-1.9.0-3.el6.noarch.rpm
+    dest: /tmp/namedmanager-www-1.9.0-3.el6.noarch.rpm   
+   
+- name: copy_namedmanager-bind
+  copy:
+    src: namedmanager-bind-1.9.0-3.el6.noarch.rpm
+    dest: /tmp/namedmanager-bind-1.9.0-3.el6.noarch.rpm
+   
+- name: install_namedmanager-www
+  yum: name=/tmp/namedmanager-www-1.9.0-3.el6.noarch.rpm state=present
+
+- name: install_namedmanager-bind
+  yum: name=/tmp/namedmanager-bind-1.9.0-3.el6.noarch.rpm state=present
+  
+- name: create_named_logs_dir 
+  file: state=directory path=/data/named/logs owner=named group=named
+   
+- name: unarchive_zh_patch
+  unarchive: 
+    src: namedmanager_zh_patch.tar.gz
+    dest: /usr/share
+    
+- name: namedmanager_www_cfg
+  template: 
+    src:  config.php.j2
+    dest: "{{ namedmanager_conf_dir }}/config.php"
+  notify:
+    - restart_httpd
+    
+- name: namedmanager_bind_cfg
+  template: 
+    src: config-bind.php.j2 
+    dest: "{{ namedmanager_conf_dir }}/config-bind.php"  
+#  notify:
+#    - restart_named
+- name: rsync_named_conf
+  copy:
+    src: named.conf
+    dest: /etc/named.conf
+    owner: named
+    group: named
+  notify:
+    - restart_named
