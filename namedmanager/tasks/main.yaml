@@ -1,16 +1,62 @@
 ---
-- name: install_mysql
-  yum: name={{ item }} state=present
-  with_items:
-    - mysql-server
-    - MySQL-python
+- block:
+  - name: install percona repos
+    yum: http://www.percona.com/downloads/percona-release/redhat/0.1-6/percona-release-0.1-6.noarch.rpm
+    state: present
+    
+  - name: install_mysql
+    yum: name={{ item }} state=present
+    with_items:
+      - Percona-Server-server-56
+      - Percona-Server-devel-56 
+      - MySQL-python
+      
+  - name: start_mysql
+    service: name=mysqld state=started enabled=yes
+  
+  - name: install_namedmanager-www
+    yum:
+      name: https://repos.jethrocarr.com/pub/amberdms/linux/centos/6/amberdms-custom/x86_64/namedmanager-www-1.9.0-3.el6.noarch.rpm
+      state: present
+  
+  - name: install_namedmanager-www
+    yum:
+      name: https://repos.jethrocarr.com/pub/amberdms/linux/centos/6/amberdms-custom/x86_64/namedmanager-bind-1.9.0-3.el6.noarch.rpm
+      state: present
+  
   when:
     - ansible_distribution == "CentOS"
     - ansible_distribution_major_version == "6"
-
-- name: start_mysql
-  service: name=mysqld state=started enabled=yes
-
+      
+- block:
+  - name: install_mysql centos7
+    yum: name={{ item }} state=present
+    with_items:
+      - mariadb mariadb-devel 
+      - mariadb-server
+      - mariadb-devel 
+      - MySQL-python
+    when:
+      - ansible_distribution == "CentOS"
+      - ansible_distribution_major_version == "7"
+  
+  - name: start_mysql centos7
+    systemd: name=mysqld state=started enabled=yes
+  
+  - name: install_namedmanager-www
+    yum:
+      name: https://repos.jethrocarr.com/pub/amberdms/linux/centos/7/jethrocarr-custom/x86_64/namedmanager-www-1.9.0-2.el7.centos.noarch.rpm
+      state: present
+  
+  - name: install_namedmanager-www centos7
+    yum:
+      name: https://repos.jethrocarr.com/pub/amberdms/linux/centos/7/jethrocarr-custom/x86_64/namedmanager-bind-1.9.0-2.el7.centos.noarch.rpm
+      state: present
+      
+  when:
+      - ansible_distribution == "CentOS"
+      - ansible_distribution_major_version == "6"
+  
 - name: set_mysql_root_pw
   shell: mysqladmin -uroot password '{{ mysql_root_pass }}'
   
@@ -39,7 +85,7 @@
 - name: copy_namedmanager_sql
   copy:
     src: namedmanager.20180421.sql.gz
-    dest: /tmp/namedmanager.sql.gz
+    dest: {{ pack_dir }}/namedmanager.sql.gz
     
 - name: import_dbsql
   mysql_db:
@@ -48,24 +94,9 @@
     login_password: "{{ mysql_root_pass }}"
     login_port: "3306"
     name: "{{ db_name_namedmanager }}"
-    target: "/tmp/namedmanager.sql.gz"
+    target: "{{ pack_dir }}/namedmanager.sql.gz"
     state: "import"
 
-- name: copy_namedmanager-www
-  copy:
-    src: namedmanager-www-1.9.0-3.el6.noarch.rpm
-    dest: /tmp/namedmanager-www-1.9.0-3.el6.noarch.rpm   
-   
-- name: copy_namedmanager-bind
-  copy:
-    src: namedmanager-bind-1.9.0-3.el6.noarch.rpm
-    dest: /tmp/namedmanager-bind-1.9.0-3.el6.noarch.rpm
-   
-- name: install_namedmanager-www
-  yum: name=/tmp/namedmanager-www-1.9.0-3.el6.noarch.rpm state=present
-
-- name: install_namedmanager-bind
-  yum: name=/tmp/namedmanager-bind-1.9.0-3.el6.noarch.rpm state=present
   
 - name: create_named_logs_dir 
   file: state=directory path=/data/named/logs owner=named group=named
