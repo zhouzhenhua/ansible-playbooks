@@ -1,8 +1,9 @@
 ---
 - block:
   - name: install percona repos
-    yum: http://www.percona.com/downloads/percona-release/redhat/0.1-6/percona-release-0.1-6.noarch.rpm
-    state: present
+    yum: 
+      name: http://www.percona.com/downloads/percona-release/redhat/0.1-6/percona-release-0.1-6.noarch.rpm
+      state: present
     
   - name: install_mysql
     yum: name={{ item }} state=present
