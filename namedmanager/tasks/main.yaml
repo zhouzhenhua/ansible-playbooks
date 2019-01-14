@@ -33,7 +33,6 @@
   - name: install_mysql centos7
     yum: name={{ item }} state=present
     with_items:
-      - mariadb mariadb-devel 
       - mariadb-server
       - mariadb-devel 
       - MySQL-python
