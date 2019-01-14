@@ -47,11 +47,13 @@
     yum:
       name: https://repos.jethrocarr.com/pub/amberdms/linux/centos/7/jethrocarr-custom/x86_64/namedmanager-www-1.9.0-2.el7.centos.noarch.rpm
       state: present
+      validate_certs: no
   
   - name: install_namedmanager-www centos7
     yum:
       name: https://repos.jethrocarr.com/pub/amberdms/linux/centos/7/jethrocarr-custom/x86_64/namedmanager-bind-1.9.0-2.el7.centos.noarch.rpm
       state: present
+      validate_certs: no
       
   when:
       - ansible_distribution == "CentOS"
