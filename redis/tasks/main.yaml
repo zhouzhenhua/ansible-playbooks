@@ -1,35 +1,4 @@
 ---
-- name: Manage sysctl
-  sysctl: name="{{ item.key }}" value="{{ item.val }}" state=present
-  with_items:
-  - { key: "vm.overcommit_memory", val: "1" }
-
-- name: disable-transparent-hugepages
-  shell: echo "never" > /sys/kernel/mm/transparent_hugepage/enabled && /sbin/sysctl -p
-
-- name: write transparent_hugepage rc.local
-  lineinfile:
-    path: /etc/rc.local
-    regexp: '^echo "never"'
-    line: 'echo "never" > /sys/kernel/mm/transparent_hugepage/enabled'
-    create: yes
-- name: write init rds rc.local
-  lineinfile:
-    path: /etc/rc.local
-    regexp: '/etc/redis/redis_{{ redis_port }}.conf'
-    line: 'su - {{ run_user }} -c "/usr/local/bin/redis-server /etc/redis/redis_{{ redis_port }}.conf"'
-    create: yes
-  tags: initrds
-
-- name: write init rds2 rc.local
-  lineinfile:
-    path: /etc/rc.local
-    regexp: '/etc/redis/redis_{{ redis_port2 }}.conf'
-    line: 'su - {{ run_user }} -c "/usr/local/bin/redis-server /etc/redis/redis_{{ redis_port2 }}.conf"'
-    create: yes
-  tags: initrds
-  when: "redis_port2 is defined"
-
 - name: Extract redisl file
   unarchive:
     src: http://download.redis.io/releases/redis-{{ redis_version }}.tar.gz 
@@ -84,3 +53,5 @@
       shell: 'su - {{ run_user }} -c "/usr/local/bin/redis-server /etc/redis/redis_{{ redis_port2 }}.conf"'
       tags: rdsrun
   when: "redis_port2 is defined"
+  
+- include: optimize_rds.yaml
