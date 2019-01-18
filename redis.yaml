@@ -1,0 +1,8 @@
+---
+- hosts: "{{ remote_server }}"
+  become: yes
+  remote_user: haomoney
+  become_user: root
+  become_method: sudo
+  roles:
+    - role: redis

@@ -1,0 +1,8 @@
+---
+- hosts: "{{ remote_server }}"
+  become: yes
+  become_user: root
+  become_method: sudo
+  remote_user: haomoney
+  roles:
+    - role: zabbix-agent
