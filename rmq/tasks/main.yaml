@@ -79,7 +79,19 @@
     write_priv: .*
     state: present
   when: "NEW_INSTALL is defined and NEW_INSTALL == 'yes'"
+  
+- name: add monitor rmq user privileges
+  rabbitmq_user:
+    user: monitor
+    password: RZyoqz2iCipuduLqILn5
+    vhost: /
+    configure_priv: .*
+    read_priv: .*
+    write_priv: .*
+    state: present
+  when: "NEW_INSTALL is defined and NEW_INSTALL == 'yes'"
+
 
 - name: add privileges
-  shell: rabbitmqctl set_user_tags {{ rmq_user }} management
+  shell: rabbitmqctl set_user_tags {{ rmq_user }} management && rabbitmqctl set_user_tags monitor monitoring
   when: "NEW_INSTALL is defined and NEW_INSTALL == 'yes'"
