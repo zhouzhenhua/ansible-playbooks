@@ -1,0 +1,139 @@
+---
+- name: echo_info
+  debug: msg="remote_server:{{ remote_server }};
+              project_name:{{ project_name }};
+              project_version:{{ project_version }};
+              remote_project_path:{{ remote_project_path }}"
+
+- name: mkdir_remote_update_dir
+  file: state=directory path=/data/update/{{ project_name }}/{{ project_version }}
+
+- name: rsync_dir
+  synchronize: 
+    src: /data/update/{{ project_name }}/{{ project_version }}
+    dest: /data/update/{{ project_name }}         
+    recursive: true
+ #   perms: true
+ #   times: true
+ #   delete: true
+  when: Rollback is undefined or Rollback != "yes"
+
+- name: get_tomcat_pid
+  shell: ps -ef | grep java | grep "{{ remote_project_path }}/bin" | grep -v grep | awk '{print $2}'
+  register: pid_num
+- name: echo tomcat_pid
+  debug: msg=" tomcat pid is {{ pid_num.stdout }}"
+  ignore_errors: true
+
+- name: copy_service.sh
+  copy: >
+    src=service_tomcat.sh
+    dest={{ remote_project_path }}/bin/service.sh
+    mode=775
+    backup=true
+  when: project_name != "test-war"
+
+- name: wait time
+  pause:
+    prompt: "wait app start time"
+    minutes: 2
+  when: ansible_hostname|regex_search('jd-web15') or ansible_hostname|regex_search('jd-web16') or ansible_hostname|regex_search('jd-web07')
+
+- block:
+  - name: down nginx upstream
+    local_action: command curl -X PUT -d '{"weight":1, "max_fails":2, "fail_timeout":10, "down":1}' {{ consul_server }}/v1/kv/{{ consul_keypath }}/{{ upstream_name }}/{{ ansible_eth0['ipv4']['address'] }}:{{ the_port }}   
+  when:
+    - consul_server is defined
+    - consul_keypath is defined
+    - upstream_name is defined
+    - the_port is defined
+  tags: stop_ngx
+
+- name: stop_tomcat
+  shell: bash service.sh stop chdir={{ remote_project_path }}/bin
+  register: info
+  changed_when: "'stop success' in info.stdout"
+
+- name: delete work temp webapps
+  shell : rm -rf {{ remote_project_path }}/work/* {{ remote_project_path }}/temp/* {{ remote_project_path }}/webapps/*
+
+- name: create_link
+  file: >
+    src=/data/update/{{ project_name }}/{{ project_version }}
+    dest={{ remote_project_path }}/webapps/{{ soft_link_name }}
+    state=link
+
+- block:
+  - name: echo_modify_info
+    debug: msg="the_file_path is {{ the_file_path }}"
+  - name: modify_content_if_necessary
+    lineinfile: path={{ the_file_path }} regexp={{ the_regexp_line }} line={{ the_new_line }} state=present backup=true
+  when: 
+     - the_file_path is defined
+     - the_regexp_line is defined
+     - the_new_line is defined
+
+- block:
+  - name: echo_copy_file_info
+    debug: msg="the file is {{ the_src_file }},the dest file is {{ the_dest_file }}" 
+  - name: copy_file_if_necessary
+    shell: /bin/cp {{ the_src_file }} {{ the_dest_file }}
+    tags: tag_copy_file
+  when: 
+    - the_src_file is defined
+    - the_dest_file is defined
+
+- name: start_tomcat
+  shell: bash service.sh start chdir={{ remote_project_path }}/bin
+  tags: tag_start_tomcat
+  when: not_start is undefined
+
+- name: get_tomcat_pid
+  shell: ps -ef | grep java | grep "{{ remote_project_path }}/bin" | grep -v grep | awk '{print $2}'
+  register: pid_num
+- name: echo new_tomcat_pid
+  debug: msg="new tomcat pid is {{ pid_num.stdout }}"
+  ignore_errors: true
+
+
+- name: wait_port
+  wait_for: delay=30 port={{ the_port }} state=started timeout={{ port_timeout }}
+  when:
+    - the_port is defined
+    - port_timeout is defined
+
+- name: sleep_jdapp
+  shell: sleep 240
+  when: ansible_hostname|regex_search('jd-web0') and project_name == "jd-app"
+
+- name: check_uri
+  uri: url={{ the_check_url }} timeout={{ timeout }} status_code={{ status_code }} return_content=yes method=GET
+  register: check_info
+  tags: tag_check_uri
+  ignore_errors: true
+  when:
+    - the_check_url is defined
+    - timeout is defined
+    - status_code is defined
+
+- name: echo_check_info
+  debug: var=check_info
+  when:
+    - the_check_url is defined
+    - timeout is defined
+    - status_code is defined
+    
+#- name: wait time
+#  pause:
+#    prompt: "wait app start time"
+#    minutes: 1
+#  when: ansible_hostname|regex_search('jd-web0') and project_name == "jd-app"
+
+- name: up nginx upstream
+  local_action: command curl -X PUT -d '{"weight":1, "max_fails":2, "fail_timeout":10, "down":0}' {{ consul_server }}/v1/kv/{{ consul_keypath }}/{{ upstream_name }}/{{ ansible_eth0['ipv4']['address'] }}:{{ the_port }}
+  when:
+    - consul_server is defined
+    - consul_keypath is defined
+    - upstream_name is defined
+    - the_port is defined
+  tags: start_ngx

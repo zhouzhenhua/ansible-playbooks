@@ -1,0 +1,102 @@
+---   
+- name: echo_info
+  debug: msg="remote_server:{{ remote_server }};
+              project_name:{{ project_name }};
+              project_version:{{ project_version }};
+              remote_project_path:{{ remote_project_path }}"
+
+- name: mkdir_remote_update_dir
+  file: state=directory path=/data/update/{{ project_name }}/{{ project_version }}
+
+- name: mkdir_remote_project_dir
+  file: state=directory path={{ remote_project_path }} recurse=yes 
+  ignore_errors: true
+
+- name: check start script
+  shell: ls 
+  {{ remote_project_path }}/service.sh
+  ignore_errors: true
+  register: start_script_exist
+
+- name: copy service.sh
+  template: src=service.sh.j2 dest={{ remote_project_path }}/service.sh mode=755
+  #when: start_script_exist|failed
+  when: start_script_exist is failed
+
+- name: copy_jar_file
+  copy:
+    src: /data/update/{{ project_name }}/{{ project_version }}/{{ project_name }}.jar
+    dest: /data/update/{{ project_name }}/{{ project_version }}/{{ project_name }}.jar
+  when: Rollback is undefined or Rollback != "yes"
+
+- name: down nginx upstream
+  local_action: command curl -X PUT -d '{"weight":1, "max_fails":2, "fail_timeout":10, "down":1}' {{ consul_server }}/v1/kv/{{ consul_keypath }}/{{ upstream_name }}/{{ ansible_eth0['ipv4']['address'] }}:{{ the_port }}
+  when:
+    - consul_server is defined
+    - consul_keypath is defined
+    - upstream_name is defined
+    - the_port is defined
+  tags: stop_ngx
+   
+- name: get_pid
+  shell: ps -ef | grep java | grep "{{ project_name }}\.jar" | grep -v grep | awk '{print $2}'
+  register: info
+- name: echo_pid
+  debug: msg="the pid is {{ info.stdout }}"
+  ignore_errors: true
+
+- name: bash_stop
+  shell: bash service.sh stop  chdir={{ remote_project_path }}
+
+- name: remove_old_link
+  file: state=absent dest={{ remote_project_path }}/{{ project_name }}.jar
+- name: create_link
+  file: >
+    state=link 
+    src=/data/update/{{ project_name }}/{{ project_version }}/{{ project_name }}.jar 
+    dest={{ remote_project_path }}/{{ project_name }}.jar
+
+- name: bash_start
+  shell: bash service.sh start chdir={{ remote_project_path }}
+  tags: tag_bash_start
+  when: not_start is undefined
+
+- name: get_new_pid
+  shell: ps -ef | grep java | grep "{{ project_name }}\.jar" | grep -v grep | awk '{print $2}'
+  register: info
+- name: echo_new_pid
+  debug: msg="the new_pid is {{ info.stdout }}"
+
+- name: sleep_app
+  shell: sleep 60
+
+- block:
+  - name: wait_port
+    wait_for: delay=10 port={{ the_port }} state=started timeout={{ port_timeout }}
+  when:
+    - the_port is defined
+    - port_timeout is defined
+  tags: wait_port
+
+
+- block:
+  - name: check_uri
+    uri: url={{ the_check_url }} timeout={{ timeout }} status_code={{ status_code }}
+    register: check_info
+    tags: tag_check_uri
+    ignore_errors: true
+  - name: echo_check_info
+    debug: var=check_info
+  when:
+    - the_check_url is defined
+    - timeout is defined
+    - status_code is defined
+
+- name: up nginx upstream
+  local_action: command curl -X PUT -d '{"weight":1, "max_fails":2, "fail_timeout":10, "down":0}' {{ consul_server }}/v1/kv/{{ consul_keypath }}/{{ upstream_name }}/{{ ansible_eth0['ipv4']['address'] }}:{{ the_port }}
+  when:
+    - consul_server is defined
+    - consul_keypath is defined
+    - upstream_name is defined
+    - the_port is defined
+  tags: start_ngx
